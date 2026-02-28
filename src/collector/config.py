@@ -25,6 +25,8 @@ Production notes:
 import logging
 from typing import Literal
 
+from pydantic import AliasChoices
+
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -92,6 +94,7 @@ class Settings(BaseSettings):
         ge=1,
         le=65535,
         description="HTTP server bind port",
+        validation_alias=AliasChoices("HTTP_PORT", "PORT"),
     )
     
     # REST API endpoints

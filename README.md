@@ -283,6 +283,13 @@ source venv/bin/activate
 # Tests coming soon
 ```
 
+## Deployment on Railway
+
+- The repository includes a `Procfile` so Railpack detects the start command: `web: PYTHONPATH=src python -m collector`.
+- The HTTP server reads the platform `PORT` environment variable (Railway sets this) via the `PORT`/`HTTP_PORT` alias—no manual port wiring needed.
+- Configure your secrets in the Railway dashboard (e.g., `SYMBOL`, `LOG_LEVEL`, `POLYMARKET_WS_URL`, `TAAPI_SECRET`, etc.). A `.env` file is only used for local development.
+- Deploy with `railway up` or the GitHub integration; dependencies are installed from `requirements.txt`.
+
 ### Code Style
 
 ```bash
