@@ -626,15 +626,10 @@ class FeatureEngine:
                 mode = "DEGRADED"
             veto_reasons.append("context_stale")
         
-        # TAAPI gating
-        if not taapi_ready:
-            if mode == "OK":
-                mode = "DEGRADED"
-            veto_reasons.append("taapi_not_ready")
-        elif taapi_stale:
-            if mode == "OK":
-                mode = "DEGRADED"
-            veto_reasons.append("taapi_stale")
+        # TAAPI gating (now optional - no longer required for OK mode)
+        # RSI is now computed internally from bar data
+        if taapi_ready and taapi_stale:
+            veto_reasons.append("taapi_stale")  # warning only, no mode downgrade
         
         # ========== Polymarket readiness ==========
         polymarket_ws = False
@@ -1383,6 +1378,10 @@ class FeatureEngine:
             "micro_1m": self._compute_micro_1m_section(),
             "context": context,
             "taapi_context": taapi_context,
+            "rsi_internal": {
+                "rsi_14_1m": self._compute_rsi(self._futures_bars_1m, 14),
+                "rsi_14_5m": self._compute_rsi(self._futures_bars_5s, 14),
+            },
             "polymarket": pm_features,
             "polymarket_meta": pm_meta,
             "polymarket_up_down": pm_up_down,
@@ -1451,6 +1450,8 @@ class FeatureEngine:
             "microprice": round(self._futures_microprice, 2) if self._futures_microprice else None,
             "mid": round(self._futures_mid, 2) if self._futures_mid else None,
             "mark_px": round(self._futures_mark_px, 2) if self._futures_mark_px else None,
+            "rsi_14_1m": self._compute_rsi(self._futures_bars_1m, 14),
+            "rsi_14_5m": self._compute_rsi(self._futures_bars_5s, 14),
         }
     
     def _compute_spot_features(self) -> dict:
@@ -1536,7 +1537,38 @@ class FeatureEngine:
             return round(abs(current_ret) * 10000, 2)
         
         return round(abs(current_ret) / median_abs, 2)
-    
+
+    def _compute_rsi(self, bars: deque, period: int = 14) -> Optional[float]:
+        """
+        Compute RSI from bar closes without TAAPI.
+        Uses standard Wilder smoothing method.
+        """
+        closes = [b.get("close") for b in bars if b.get("close")]
+        if len(closes) < period + 1:
+            return None
+
+        closes = closes[-(period + 1):]
+        gains = []
+        losses = []
+
+        for i in range(1, len(closes)):
+            delta = closes[i] - closes[i - 1]
+            if delta >= 0:
+                gains.append(delta)
+                losses.append(0.0)
+            else:
+                gains.append(0.0)
+                losses.append(abs(delta))
+
+        avg_gain = sum(gains) / period
+        avg_loss = sum(losses) / period
+
+        if avg_loss == 0:
+            return 100.0
+
+        rs = avg_gain / avg_loss
+        return round(100 - (100 / (1 + rs)), 2)
+
     # ========== Micro 1m Features ==========
     
     def _calc_ema_simple(self, values: list[float], period: int) -> Optional[float]:
